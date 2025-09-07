@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 
-/// Combined position monitoring data (TCP pose + joint angles)
+/// Combined position monitoring data (TCP pose + joint angles + RPY attitude)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PositionData {
     /// Robot's internal timestamp (seconds since robot power-on)
@@ -22,6 +22,15 @@ pub struct PositionData {
     pub tcp_pose: [f64; 6],
     /// Joint angles in radians [q0, q1, q2, q3, q4, q5]
     pub joint_positions: [f64; 6],
+    /// Roll angle in degrees (from TCP orientation)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub roll_deg: Option<f64>,
+    /// Pitch angle in degrees (from TCP orientation)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pitch_deg: Option<f64>,
+    /// Yaw rate in degrees per second (computed from orientation changes)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub yaw_rate_dps: Option<f64>,
 }
 
 /// Robot state monitoring data
@@ -75,6 +84,9 @@ impl PositionData {
             round_value(joint_positions[4]),
             round_value(joint_positions[5]),
         ];
+
+        // Extract RPY from TCP pose orientation (rx, ry, rz are in radians)
+        let (roll_deg, pitch_deg) = Self::extract_roll_pitch_from_tcp(&tcp_pose);
         
         Self {
             rtime,
@@ -82,7 +94,69 @@ impl PositionData {
             event_type: "position".to_string(),
             tcp_pose: rounded_tcp_pose,
             joint_positions: rounded_joint_positions,
+            roll_deg: roll_deg.map(|r| round_value(r)),
+            pitch_deg: pitch_deg.map(|p| round_value(p)),
+            yaw_rate_dps: None, // Will be computed from orientation changes over time
         }
+    }
+
+    pub fn new_with_rpy(
+        tcp_pose: [f64; 6], 
+        joint_positions: [f64; 6], 
+        roll_deg: Option<f64>,
+        pitch_deg: Option<f64>,
+        yaw_rate_dps: Option<f64>,
+        rtime: Option<f64>, 
+        stime: f64, 
+        decimal_places: u32
+    ) -> Self {
+        // Helper function to round values
+        let round_value = |value: f64| -> f64 {
+            let multiplier = 10.0_f64.powi(decimal_places as i32);
+            (value * multiplier).round() / multiplier
+        };
+        
+        let rounded_tcp_pose = [
+            round_value(tcp_pose[0]),
+            round_value(tcp_pose[1]),
+            round_value(tcp_pose[2]),
+            round_value(tcp_pose[3]),
+            round_value(tcp_pose[4]),
+            round_value(tcp_pose[5]),
+        ];
+        
+        let rounded_joint_positions = [
+            round_value(joint_positions[0]),
+            round_value(joint_positions[1]),
+            round_value(joint_positions[2]),
+            round_value(joint_positions[3]),
+            round_value(joint_positions[4]),
+            round_value(joint_positions[5]),
+        ];
+        
+        Self {
+            rtime,
+            stime,
+            event_type: "position".to_string(),
+            tcp_pose: rounded_tcp_pose,
+            joint_positions: rounded_joint_positions,
+            roll_deg: roll_deg.map(|r| round_value(r)),
+            pitch_deg: pitch_deg.map(|p| round_value(p)),
+            yaw_rate_dps: yaw_rate_dps.map(|y| round_value(y)),
+        }
+    }
+
+    /// Extract roll and pitch angles from TCP pose orientation
+    /// TCP pose format: [x, y, z, rx, ry, rz] where rx, ry, rz are rotation vectors in radians
+    fn extract_roll_pitch_from_tcp(tcp_pose: &[f64; 6]) -> (Option<f64>, Option<f64>) {
+        let rx = tcp_pose[3]; // Roll rotation vector component
+        let ry = tcp_pose[4]; // Pitch rotation vector component
+        
+        // Convert from radians to degrees
+        let roll_deg = rx.to_degrees();
+        let pitch_deg = ry.to_degrees();
+        
+        (Some(roll_deg), Some(pitch_deg))
     }
 }
 
@@ -214,23 +288,43 @@ impl MonitorOutput {
             .map(|&v| format!("{:.prec$}", v, prec = self.decimal_places as usize))
             .collect();
         
+        // Build RPY fields if available
+        let mut rpy_fields = Vec::new();
+        if let Some(roll) = data.roll_deg {
+            rpy_fields.push(format!(r#""roll_deg":{:.2}"#, roll));
+        }
+        if let Some(pitch) = data.pitch_deg {
+            rpy_fields.push(format!(r#""pitch_deg":{:.2}"#, pitch));
+        }
+        if let Some(yaw_rate) = data.yaw_rate_dps {
+            rpy_fields.push(format!(r#""yaw_rate_dps":{:.2}"#, yaw_rate));
+        }
+        
+        let rpy_part = if !rpy_fields.is_empty() {
+            format!(",{}", rpy_fields.join(","))
+        } else {
+            String::new()
+        };
+        
         // Build JSON with both timestamp fields
         let json = if let Some(rtime) = data.rtime {
             format!(
-                r#"{{"rtime":{:.6},"stime":{:.6},"type":"{}","tcp_pose":[{}],"joint_positions":[{}]}}"#,
+                r#"{{"rtime":{:.6},"stime":{:.6},"type":"{}","tcp_pose":[{}],"joint_positions":[{}]{}}}"#,
                 rtime,
                 data.stime,
                 data.event_type,
                 tcp_formatted.join(","),
-                joint_formatted.join(",")
+                joint_formatted.join(","),
+                rpy_part
             )
         } else {
             format!(
-                r#"{{"stime":{:.6},"type":"{}","tcp_pose":[{}],"joint_positions":[{}]}}"#,
+                r#"{{"stime":{:.6},"type":"{}","tcp_pose":[{}],"joint_positions":[{}]{}}}"#,
                 data.stime,
                 data.event_type,
                 tcp_formatted.join(","),
-                joint_formatted.join(",")
+                joint_formatted.join(","),
+                rpy_part
             )
         };
         

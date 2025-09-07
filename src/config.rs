@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use crate::{Result, URError};
+use crate::rpy_analysis::RPYAnalysisConfig;
 
 // Config is now just an alias for DaemonConfig since everything is flattened
 pub type Config = DaemonConfig;
@@ -47,6 +48,7 @@ pub struct DaemonConfig {
     pub publishing: PublishingConfig,
     pub command: CommandConfig,
     pub interpreter: Option<InterpreterConfig>,
+    pub rpy_analysis: Option<RPYAnalysisConfig>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -125,5 +127,10 @@ impl DaemonConfig {
     /// Get interpreter configuration with defaults
     pub fn interpreter(&self) -> InterpreterConfig {
         self.interpreter.clone().unwrap_or_default()
+    }
+    
+    /// Get RPY analysis configuration with defaults
+    pub fn rpy_analysis(&self) -> RPYAnalysisConfig {
+        self.rpy_analysis.clone().unwrap_or_default()
     }
 }

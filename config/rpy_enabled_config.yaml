@@ -1,6 +1,6 @@
 ---
-# Unified Daemon Configuration
-# This file contains all configuration for the UR daemon
+# URD Configuration with RPY Analysis Enabled
+# This demonstrates the integrated RPY diffusion analysis capabilities
 
 # Robot Configuration
 robot:
@@ -45,20 +45,20 @@ command:
 
 # RPY Analysis Configuration (Roll-Pitch-Yaw attitude analysis)
 rpy_analysis:
-  # Enable RPY attitude analysis
-  enabled: false
+  # Enable RPY attitude analysis - THIS IS THE KEY INTEGRATION!
+  enabled: true
   
   # Number of samples to keep for analysis window
-  analysis_window_size: 1000
+  analysis_window_size: 500
   
   # Correlation threshold for detecting significant relationships  
-  correlation_threshold: 0.3
+  correlation_threshold: 0.25
   
   # Minimum samples before analysis starts
-  min_samples: 100
+  min_samples: 50
   
-  # Output analysis results every N samples
-  output_interval: 250
+  # Output analysis results every N samples (for demonstration)
+  output_interval: 100
   
   # Enable depth error analysis (requires depth sensor data)
   depth_analysis_enabled: false

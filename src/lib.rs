@@ -9,6 +9,7 @@ pub mod error;
 pub mod interpreter;
 pub mod json_output;
 pub mod monitoring;
+pub mod rpy_analysis;
 pub mod rtde;
 pub mod stream;
 
@@ -18,6 +19,7 @@ pub use error::{Result, URError};
 pub use interpreter::{InterpreterClient, CommandResult};
 pub use json_output::{CommandStatusEvent, ErrorEvent, BufferEvent, CommandStatus};
 pub use monitoring::{MonitorOutput, PositionData, RobotStateData};
+pub use rpy_analysis::{RPYAnalyzer, RPYAnalysisConfig, RPYStatistics, RPYSample, output_rpy_statistics, compute_yaw_rate};
 pub use rtde::{RTDEClient, RTDEMessage, RobotState, RTDESubscriber};
 pub use stream::{CommandStream, CommandStats};
 

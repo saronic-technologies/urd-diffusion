@@ -8,6 +8,7 @@ use crate::{
     interpreter::InterpreterClient,
     monitoring::{MonitorOutput, PositionData, RobotStateData, 
                 get_robot_mode_name, get_safety_mode_name, get_runtime_state_name},
+    rpy_analysis::{RPYAnalyzer, output_rpy_statistics, compute_yaw_rate},
     rtde::RTDEClient,
 };
 use anyhow::{anyhow, Context, Result};
@@ -39,6 +40,9 @@ pub struct RobotController {
     interpreter: Option<InterpreterClient>,
     rtde_monitor: Option<RTDEClient>,
     monitor_output: Option<MonitorOutput>,
+    rpy_analyzer: Option<RPYAnalyzer>,
+    last_orientation: Option<[f64; 3]>, // For yaw rate calculation
+    last_timestamp: Option<f64>,
     state: RobotState,
 }
 
@@ -55,6 +59,9 @@ impl RobotController {
             interpreter: None,
             rtde_monitor: None,
             monitor_output: None,
+            rpy_analyzer: None,
+            last_orientation: None,
+            last_timestamp: None,
             state: RobotState::Disconnected,
         })
     }
@@ -213,6 +220,13 @@ impl RobotController {
         
         self.monitor_output = Some(MonitorOutput::new(pub_rate_hz, dynamic_mode, decimal_places));
         
+        // Initialize RPY analyzer if enabled
+        let rpy_config = self.daemon_config.rpy_analysis();
+        if rpy_config.enabled {
+            info!("Initializing RPY analysis with window size: {}", rpy_config.analysis_window_size);
+            self.rpy_analyzer = Some(RPYAnalyzer::new(rpy_config));
+        }
+        
         info!("RTDE monitoring started with JSON output");
         info!("Publication rate: {}Hz, Dynamic mode: {}", pub_rate_hz, dynamic_mode);
         Ok(())
@@ -339,10 +353,56 @@ impl RobotController {
         robot_timestamp: Option<f64>,
         wire_timestamp: f64
     ) {
+        // Compute RPY data from TCP pose
+        let roll_deg = tcp_pose[3].to_degrees();
+        let pitch_deg = tcp_pose[4].to_degrees();
+        
+        // Compute yaw rate if we have previous orientation data
+        let yaw_rate_dps = if let (Some(last_orientation), Some(last_ts)) = 
+            (self.last_orientation, self.last_timestamp) {
+            let current_orientation = [tcp_pose[3], tcp_pose[4], tcp_pose[5]];
+            let dt = wire_timestamp - last_ts;
+            if dt > 0.0 {
+                compute_yaw_rate(current_orientation, last_orientation, dt)
+            } else {
+                0.0
+            }
+        } else {
+            0.0
+        };
+
+        // Update state for next iteration
+        self.last_orientation = Some([tcp_pose[3], tcp_pose[4], tcp_pose[5]]);
+        self.last_timestamp = Some(wire_timestamp);
+
+        // Process RPY analysis if enabled
+        if let Some(rpy_analyzer) = &mut self.rpy_analyzer {
+            if let Some(stats) = rpy_analyzer.add_sample(
+                wire_timestamp,
+                roll_deg,
+                pitch_deg,
+                yaw_rate_dps,
+                tcp_pose,
+                joint_positions,
+                None, // No depth error data available yet
+            ) {
+                output_rpy_statistics(&stats);
+            }
+        }
+
         if let Some(monitor_output) = &mut self.monitor_output {
-            // Check and output combined position data (TCP + joints)
+            // Check and output combined position data (TCP + joints) with RPY
             if monitor_output.should_output_position(tcp_pose, joint_positions, wire_timestamp) {
-                let position_data = PositionData::new_rounded(tcp_pose, joint_positions, robot_timestamp, wire_timestamp, monitor_output.decimal_places);
+                let position_data = PositionData::new_with_rpy(
+                    tcp_pose, 
+                    joint_positions, 
+                    Some(roll_deg),
+                    Some(pitch_deg),
+                    Some(yaw_rate_dps),
+                    robot_timestamp, 
+                    wire_timestamp, 
+                    monitor_output.decimal_places
+                );
                 monitor_output.output_position(&position_data);
             }
             
