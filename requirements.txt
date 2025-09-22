@@ -1,0 +1,39 @@
+# Online Calibration Support Vector System Requirements
+# Python dependencies for VGGT-inspired robot calibration
+
+# Core scientific computing
+numpy>=1.21.0
+scipy>=1.7.0
+
+# Computer vision
+opencv-python>=4.5.0
+opencv-contrib-python>=4.5.0
+
+# Machine learning
+scikit-learn>=1.0.0
+
+# Data handling
+pandas>=1.3.0
+
+# Configuration and utilities  
+pyyaml>=6.0
+dataclasses-json>=0.5.0
+
+# Networking
+requests>=2.25.0
+
+# Logging and monitoring
+coloredlogs>=15.0
+
+# Optional: Advanced vision processing
+# torch>=1.9.0
+# torchvision>=0.10.0
+# transformers>=4.0.0
+
+# Optional: 3D processing
+# open3d>=0.13.0
+# trimesh>=3.9.0
+
+# Optional: Optimization
+# cvxpy>=1.2.0
+# casadi>=3.5.0

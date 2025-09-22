@@ -1,0 +1,173 @@
+# Online Calibration Support Vector Configuration
+# Parameters for VGGT-inspired robot calibration system
+
+# Camera Configuration
+camera:
+  device_id: 0
+  resolution:
+    width: 1280
+    height: 720
+  fps: 30
+  
+  # Calibration parameters
+  checkerboard:
+    pattern_size: [9, 6]  # Internal corners
+    square_size: 0.025    # 25mm squares
+    min_images: 15        # Minimum images for calibration
+  
+  # ArUco marker detection
+  markers:
+    dictionary: "DICT_6X6_250"
+    marker_size: 0.05     # 5cm markers
+    detection_params:
+      adaptiveThreshConstant: 7
+      minMarkerPerimeterRate: 0.03
+      maxMarkerPerimeterRate: 4.0
+
+# Robot Configuration
+robot:
+  # Workspace boundaries (meters)
+  workspace:
+    x_min: -0.4
+    x_max: 0.4
+    y_min: 0.2
+    y_max: 0.8
+    z_min: 0.05
+    z_max: 0.5
+  
+  # Movement parameters
+  motion:
+    default_speed: 0.1      # m/s
+    default_acceleration: 0.1  # m/s²
+    blend_radius: 0.01      # m
+    settling_time: 1.0      # seconds
+  
+  # Joint limits (radians)
+  joint_limits:
+    - [-6.28, 6.28]   # Base
+    - [-6.28, 6.28]   # Shoulder  
+    - [-3.14, 3.14]   # Elbow
+    - [-6.28, 6.28]   # Wrist 1
+    - [-6.28, 6.28]   # Wrist 2
+    - [-6.28, 6.28]   # Wrist 3
+
+# Calibration Process
+calibration:
+  # Number of calibration poses to collect
+  num_poses: 20
+  
+  # Pose generation strategy
+  pose_strategy: "grid_random"  # "grid", "random", "grid_random"
+  
+  # Quality thresholds
+  min_confidence: 0.7
+  max_reprojection_error: 2.0  # pixels
+  
+  # Data collection
+  max_calibration_points: 1000
+  online_update_interval: 50   # Update SVM every N new points
+
+# Support Vector Machine Configuration
+svm:
+  # Kernel parameters
+  kernel: "rbf"
+  gamma: "scale"
+  C: 1.0
+  epsilon: 0.1
+  
+  # Training parameters
+  min_training_samples: 10
+  cross_validation_folds: 5
+  
+  # Trajectory optimization
+  trajectory:
+    default_waypoints: 10
+    smoothing_factor: 0.1
+    max_acceleration: 2.0    # m/s²
+    max_velocity: 0.5        # m/s
+
+# Vision Processing
+vision:
+  # Processing rates
+  processing_rate: 10.0      # Hz
+  display_rate: 30.0         # Hz
+  
+  # Pose estimation
+  pose_estimation:
+    method: "aruco"          # "aruco", "checkerboard", "sift"
+    refinement: true
+    outlier_threshold: 3.0   # Standard deviations
+  
+  # Visualization
+  visualization:
+    show_detections: true
+    show_pose_axes: true
+    axis_length: 0.1         # meters
+    save_debug_images: false
+
+# Online Learning
+online_learning:
+  enabled: true
+  
+  # Adaptation parameters
+  learning_rate: 0.01
+  forgetting_factor: 0.95
+  
+  # Quality filtering
+  confidence_threshold: 0.8
+  consistency_check: true
+  temporal_smoothing: true
+  
+  # Model updates
+  incremental_updates: true
+  batch_update_size: 20
+  model_validation: true
+
+# Logging and Monitoring
+logging:
+  level: "INFO"              # DEBUG, INFO, WARNING, ERROR
+  file: "calibration.log"
+  max_size: "10MB"
+  backup_count: 5
+  
+  # Data logging
+  save_calibration_data: true
+  data_directory: "calibration_data"
+  
+# Safety and Error Handling
+safety:
+  # Motion limits
+  max_cartesian_velocity: 1.0    # m/s
+  max_joint_velocity: 3.14       # rad/s
+  
+  # Error recovery
+  max_retry_attempts: 3
+  emergency_stop_enabled: true
+  
+  # Collision detection
+  collision_checking: true
+  safety_zones:
+    - name: "table"
+      type: "box"
+      bounds: [-0.5, 0.5, 0.0, 1.0, -0.05, 0.0]
+    
+# Advanced Features (VGGT-inspired)
+advanced:
+  # Multi-view processing
+  multi_view:
+    enabled: false
+    max_views: 4
+    view_selection: "optimal"
+  
+  # Transformer-based features
+  transformer:
+    enabled: false
+    model_path: ""
+    feature_dimension: 256
+    attention_heads: 8
+  
+  # 3D reconstruction
+  reconstruction:
+    enabled: false
+    method: "stereo"         # "stereo", "structure_from_motion"
+    point_cloud_processing: true
